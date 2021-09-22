@@ -15,6 +15,7 @@ from braket.circuits import (  # noqa: F401
     circuit,
     compiler_directives,
     gates,
+    composite_operators,
     noises,
     observables,
     result_types,
@@ -34,3 +35,4 @@ from braket.circuits.quantum_operator import QuantumOperator  # noqa: F401
 from braket.circuits.qubit import Qubit, QubitInput  # noqa: F401
 from braket.circuits.qubit_set import QubitSet, QubitSetInput  # noqa: F401
 from braket.circuits.result_type import ObservableResultType, ResultType  # noqa: F401
+from braket.circuits.composite_operator import CompositeOperator

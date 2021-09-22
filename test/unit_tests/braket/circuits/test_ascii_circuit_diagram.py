@@ -205,6 +205,25 @@ def test_connector_across_non_used_qubits():
     assert AsciiCircuitDiagram.build_diagram(circ) == expected
 
 
+def test_connector_for_composite_operator():
+    circ = Circuit().h(3).qft([0, 1, 3]).i(2).h(2)
+    expected = (
+        "T  : |0|  1  |",
+        "              ",
+        "q0 : ---QFT---",
+        "        | |   ",
+        "q1 : ---|*|---",
+        "        | |   ",
+        "q2 : -I-| |-H-",
+        "        | |   ",
+        "q3 : -H-|*|---",
+        "",
+        "T  : |0|  1  |",
+    )
+    expected = "\n".join(expected)
+    assert AsciiCircuitDiagram.build_diagram(circ) == expected
+
+
 def test_verbatim_1q_no_preceding():
     circ = Circuit().add_verbatim_box(Circuit().h(0))
     expected = (

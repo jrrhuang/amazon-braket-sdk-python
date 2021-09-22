@@ -44,7 +44,7 @@ class QuantumOperator(Operator):
         Raises:
             TypeError: `qubit_count` is not an int
             ValueError: `qubit_count` is less than 1, `ascii_symbols` are `None`,
-                ``fixed_qubit_count`` is implemented and and not equal to ``qubit_count``,
+                ``fixed_qubit_count`` is implemented and not equal to ``qubit_count``,
                 or ``len(ascii_symbols) != qubit_count``
         """
 
@@ -59,6 +59,13 @@ class QuantumOperator(Operator):
                 )
             self._qubit_count = fixed_qubit_count
 
+            if len(ascii_symbols) != self._qubit_count:
+                msg = (
+                    f"ascii_symbols, {ascii_symbols},"
+                    f" length must equal qubit_count, {self._qubit_count}"
+                )
+                raise ValueError(msg)
+
         if not isinstance(self._qubit_count, int):
             raise TypeError(f"qubit_count, {self._qubit_count}, must be an integer")
 
@@ -68,12 +75,6 @@ class QuantumOperator(Operator):
         if ascii_symbols is None:
             raise ValueError("ascii_symbols must not be None")
 
-        if len(ascii_symbols) != self._qubit_count:
-            msg = (
-                f"ascii_symbols, {ascii_symbols},"
-                f" length must equal qubit_count, {self._qubit_count}"
-            )
-            raise ValueError(msg)
         self._ascii_symbols = tuple(ascii_symbols)
 
     @staticmethod

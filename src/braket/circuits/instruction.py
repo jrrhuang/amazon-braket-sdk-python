@@ -12,9 +12,10 @@
 # language governing permissions and limitations under the License.
 
 from __future__ import annotations
-
 from typing import Dict, Tuple
 
+from braket.circuits.gate import Gate
+from braket.circuits.composite_operator import CompositeOperator
 from braket.circuits.operator import Operator
 from braket.circuits.quantum_operator import QuantumOperator
 from braket.circuits.qubit import QubitInput
@@ -134,6 +135,18 @@ class Instruction:
             return Instruction(self._operator, target)
         else:
             return Instruction(self._operator, self._target.map(target_mapping or {}))
+
+    def decompose(self):
+        """
+        Decomposes the instruction.
+
+        Returns:
+            Iterable[Instruction]: iterable of instructions
+        """
+        if isinstance(self._operator, CompositeOperator):
+            return self._operator.decompose(self._target)
+        else:
+            return [self]
 
     def __repr__(self):
         return f"Instruction('operator': {self._operator}, 'target': {self._target})"

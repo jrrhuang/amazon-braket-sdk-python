@@ -16,6 +16,7 @@ from typing import List, Tuple, Union
 from braket.circuits.circuit_diagram import CircuitDiagram
 from braket.circuits.compiler_directive import CompilerDirective
 from braket.circuits.gate import Gate
+from braket.circuits.composite_operator import CompositeOperator
 from braket.circuits.instruction import Instruction
 from braket.circuits.noise import Noise
 from braket.circuits.qubit_set import QubitSet
@@ -104,9 +105,9 @@ class AsciiCircuitDiagram(CircuitDiagram):
         """
         groupings = []
         for item in items:
-            # Can only print Gate and Noise operators for instructions at the moment
+            # Can only print Gate, Composite, and Noise operators for instructions at the moment
             if isinstance(item, Instruction) and not isinstance(
-                item.operator, (Gate, Noise, CompilerDirective)
+                item.operator, (Gate, CompositeOperator, Noise, CompilerDirective)
             ):
                 continue
 
@@ -236,22 +237,47 @@ class AsciiCircuitDiagram(CircuitDiagram):
                 qubits = circuit_qubits.intersection(
                     set(range(min(item.target), max(item.target) + 1))
                 )
-                ascii_symbols = item.ascii_symbols
+                ascii_symbols = (
+                    item.operator.ascii_symbols
+                    if isinstance(item, Instruction)
+                    else item.ascii_symbols
+                )
+            if hasattr(item, "operator") and isinstance(item.operator, CompositeOperator):
+                spacing = max(1, len(item.operator.ascii_symbols[0]) - 2)
+                for qubit in qubits:
+                    # Determine if the qubit is part of the item or in the middle of a
+                    # multi qubit item.
+                    if qubit in target_qubits:
+                        item_qubit_index = [
+                            index for index, q in enumerate(target_qubits) if q == qubit
+                        ][0]
+                        if qubit != min(target_qubits):
+                            half_1 = " " * int((spacing - 1) / 2)
+                            half_2 = " " * (spacing - len(half_1) - 1)
+                            symbols[qubit] = "|" + half_1 + "*" + half_2 + "|"
+                        else:
+                            symbols[qubit] = ascii_symbols[item_qubit_index]
+                    else:
+                        symbols[qubit] = "|" + " " * spacing + "|"
 
-            for qubit in qubits:
-                # Determine if the qubit is part of the item or in the middle of a
-                # multi qubit item.
-                if qubit in target_qubits:
-                    item_qubit_index = [
-                        index for index, q in enumerate(target_qubits) if q == qubit
-                    ][0]
-                    symbols[qubit] = ascii_symbols[item_qubit_index]
-                else:
-                    symbols[qubit] = "|"
+                    # Set the margin to be a pair of connectors if not on the first qubit
+                    if qubit != min(target_qubits):
+                        margins[qubit] = "|" + " " * spacing + "|"
+            else:
+                for qubit in qubits:
+                    # Determine if the qubit is part of the item or in the middle of a
+                    # multi qubit item.
+                    if qubit in target_qubits:
+                        item_qubit_index = [
+                            index for index, q in enumerate(target_qubits) if q == qubit
+                        ][0]
+                        symbols[qubit] = ascii_symbols[item_qubit_index]
+                    else:
+                        symbols[qubit] = "|"
 
-                # Set the margin to be a connector if not on the first qubit
-                if qubit != min(target_qubits):
-                    margins[qubit] = "|"
+                    # Set the margin to be a connector if not on the first qubit
+                    if qubit != min(target_qubits):
+                        margins[qubit] = "|"
 
         symbols_width = max([len(symbol) for symbol in symbols.values()])
 

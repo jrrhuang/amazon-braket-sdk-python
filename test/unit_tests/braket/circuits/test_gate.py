@@ -35,6 +35,19 @@ def test_to_matrix_not_implemented_by_default(gate):
     gate.to_matrix(None)
 
 
+@pytest.mark.xfail(raises=ValueError)
+def test_mismatch_length_ascii():
+    class foobar(Gate):
+        def __init__(self):
+            super().__init__(qubit_count=None, ascii_symbols=["foo", "bar"])
+
+        @staticmethod
+        def fixed_qubit_count() -> int:
+            return 1
+
+    foobar()
+
+
 def test_matrix_equivalence():
     gate1 = Gate.H()
     gate2 = Gate.H()
