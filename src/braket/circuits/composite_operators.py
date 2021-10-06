@@ -1,12 +1,16 @@
 # general imports
 import math
 from enum import Enum
+from scipy.linalg import cossin, eig
 
 # AWS imports: Import Braket SDK modules
 from braket.circuits.composite_operator import CompositeOperator
 from braket.circuits.gates import *
 from braket.circuits.instruction import Instruction
 from braket.circuits.qubit_set import QubitSet
+from braket.circuits.synthesis.one_qubit_decomposition import OneQubitDecomposition
+from braket.circuits.synthesis.two_qubit_decomposition import (TwoQubitDecomposition,
+                                                               two_qubit_decompose)
 
 
 class QFT_Method(Enum):
@@ -19,6 +23,18 @@ class QFT_Method(Enum):
     @staticmethod
     def values():
         return list(map(str, QFT_Method))
+
+
+class Unitary_Method(Enum):
+    DEFAULT = "default"
+    SHANNON = "shannon"
+
+    def __str__(self):
+        return self.value
+
+    @staticmethod
+    def values():
+        return list(map(str, Unitary_Method))
 
 
 class GHZ(CompositeOperator):
@@ -377,7 +393,7 @@ class QPE(CompositeOperator):
     """
 
     def __init__(
-        self, precision_qubit_count: int, query_qubit_count: int, matrix: np.ndarray, control=True
+            self, precision_qubit_count: int, query_qubit_count: int, matrix: np.ndarray, control=True
     ):
         Gate.Unitary(matrix)
         self._matrix = np.array(matrix, dtype=complex)
@@ -433,8 +449,8 @@ class QPE(CompositeOperator):
 
         precision_qubits = target[: self._precision_qubit_count]
         query_qubits = target[
-            self._precision_qubit_count : self._precision_qubit_count + self._query_qubit_count
-        ]
+                       self._precision_qubit_count : self._precision_qubit_count + self._query_qubit_count
+                       ]
 
         # Apply Hadamard across precision qubits
         instructions = [Instruction(Gate.H(), target=qubit) for qubit in precision_qubits]
@@ -506,3 +522,270 @@ class QPE(CompositeOperator):
 
 
 CompositeOperator.register_composite_operator(QPE)
+
+
+class MCRy(CompositeOperator):
+    """
+    Operator for Multi-controlled Ry gate.
+
+    Args:
+        qubit_count (int): Number of target qubits.
+    """
+
+    def __init__(self, qubit_count: int, angle: float):
+        self._angle = angle
+        super().__init__(qubit_count=qubit_count, ascii_symbols=["MCRy"])
+
+    def to_ir(self, target: QubitSet):
+        return [instr.to_ir() for instr in self.decompose(target)]
+
+    def decompose(self, target: QubitSet) -> Iterable[Instruction]:
+        """
+        Returns an iterable of instructions corresponding to the Multi-controlled Ry gate,
+        applied to the argument qubits.
+
+        Args:
+            target (QubitSet): Target qubits
+
+        Returns:
+            Iterable[Instruction]: iterable of instructions for MCRy
+
+        Raises:
+            ValueError: If number of qubits in `target` does not equal `qubit_count`.
+        """
+        if len(target) != self.qubit_count:
+            raise ValueError(
+                f"Operator qubit count {self.qubit_count} must be "
+                f"equal to size of target qubit set {target}"
+            )
+
+        instructions = []
+
+        for i in range(2):
+            if len(target) == 2:
+                instructions.append(Instruction(Gate.Ry(self._angle), target=target[-1]))
+            else:
+                instructions.append(Instruction(CompositeOperator.MCRy(), target=[target[1:]]))
+            instructions.append(Instruction(Gate.CNot(), target=[target[0], target[-1]]))
+        return instructions
+
+    @staticmethod
+    @circuit.subroutine(register=True)
+    def mcry(controls: QubitSet, target: QubitInput, angle: float):
+        """
+        Registers this function into the circuit class.
+
+        Args:
+            controls (QubitSet): Control qubits.
+            target (Qubit or int): Target qubit index.
+            angle (float): Angle in radians.
+
+        Returns:
+            Instruction: MCRy instruction.
+
+        Examples:
+            >>> circ = Circuit().mcry([1, 2], 3, 0)
+        """
+        return Instruction(CompositeOperator.MCRy(len(controls) + 1, angle), target=list(controls) + [target])
+
+
+CompositeOperator.register_composite_operator(MCRy)
+
+
+class MCRz(CompositeOperator):
+    """
+    Operator for Multi-controlled Rz gate.
+
+    Args:
+        qubit_count (int): Number of target qubits.
+    """
+
+    def __init__(self, qubit_count: int, angle: float):
+        self._angle = angle
+        super().__init__(qubit_count=qubit_count, ascii_symbols=["MCRz"])
+
+    def to_ir(self, target: QubitSet):
+        return [instr.to_ir() for instr in self.decompose(target)]
+
+    def decompose(self, target: QubitSet) -> Iterable[Instruction]:
+        """
+        Returns an iterable of instructions corresponding to the Multi-controlled Rz gate,
+        applied to the argument qubits.
+
+        Args:
+            target (QubitSet): Target qubits
+
+        Returns:
+            Iterable[Instruction]: iterable of instructions for MCRz
+
+        Raises:
+            ValueError: If number of qubits in `target` does not equal `qubit_count`.
+        """
+        if len(target) != self.qubit_count:
+            raise ValueError(
+                f"Operator qubit count {self.qubit_count} must be "
+                f"equal to size of target qubit set {target}"
+            )
+
+        instructions = []
+
+        for i in range(2):
+            if len(target) == 2:
+                instructions.append(Instruction(Gate.Rz(self._angle), target=target[-1]))
+            else:
+                instructions.append(Instruction(CompositeOperator.MCRz(), target=[target[1:]]))
+            instructions.append(Instruction(Gate.CNot(), target=[target[0], target[-1]]))
+        return instructions
+
+    @staticmethod
+    @circuit.subroutine(register=True)
+    def mcrz(controls: QubitSet, target: QubitInput, angle: float):
+        """
+        Registers this function into the circuit class.
+
+        Args:
+            controls (QubitSet): Control qubits.
+            target (Qubit or int): Target qubit index.
+            angle (float): Angle in radians.
+
+        Returns:
+            Instruction: MCRz instruction.
+
+        Examples:
+            >>> circ = Circuit().mcrz([1, 2], 3, 0)
+        """
+        return Instruction(CompositeOperator.MCRz(len(controls) + 1, angle), target=list(controls) + [target])
+
+
+CompositeOperator.register_composite_operator(MCRz)
+
+
+class Unitary(CompositeOperator):
+    """
+    Operator for generic unitary.
+
+    Args:
+        qubit_count (int): Number of target qubits.
+    """
+
+    def __init__(self, matrix: np.ndarray, display_name: str = "U", method=Unitary_Method.DEFAULT):
+        verify_quantum_operator_matrix_dimensions(matrix)
+        self._matrix = np.array(matrix, dtype=complex)
+        qubit_count = int(np.log2(self._matrix.shape[0]))
+
+        if not is_unitary(self._matrix):
+            raise ValueError(f"{self._matrix} is not unitary")
+
+        if str(method) not in Unitary_Method.values():
+            raise TypeError("method must either be 'default' or 'shannon'.")
+
+        self._method = str(method)
+
+        super().__init__(qubit_count=qubit_count, ascii_symbols=[display_name])
+
+    def to_ir(self, target: QubitSet):
+        return [instr.to_ir() for instr in self.decompose(target)]
+
+    def decompose(self, target: QubitSet) -> Iterable[Instruction]:
+        """
+        Returns an iterable of instructions corresponding to the Unitary operator,
+        applied to the argument qubits.
+
+        Args:
+            target (QubitSet): Target qubits
+
+        Returns:
+            Iterable[Instruction]: iterable of instructions for Unitary
+
+        Raises:
+            ValueError: If number of qubits in `target` does not equal `qubit_count`.
+        """
+        if len(target) != self.qubit_count:
+            raise ValueError(
+                f"Operator qubit count {self.qubit_count} must be "
+                f"equal to size of target qubit set {target}"
+            )
+
+        instructions = []
+
+        if self._method == "shannon":
+            dim = self._matrix.shape[0]
+
+            # One-qubit decomposition
+            if dim == 2:
+                one_qubit_decomp_circ = OneQubitDecomposition(self._matrix).build_circuit(target)
+                instructions += one_qubit_decomp_circ.instructions
+
+            # Two-qubit decomposition
+            elif dim == 4:
+                two_qubit_decomp_circ = TwoQubitDecomposition(self._matrix).build_circuit(target)
+                instructions += two_qubit_decomp_circ.instructions
+
+            else:
+                u, cs, vdh = cossin(self._matrix, p= dim // 2, q= dim // 2, separate=True)
+
+                d1, v1 = np.linalg.eig(u[0] @ u[1].conj().T)
+                d2, v2 = np.linalg.eig(vdh[0] @ vdh[1].conj().T)
+                d1 = np.sqrt(d1)
+                d2 = np.sqrt(d2)
+                v1 = v1.conj().T
+                v2 = v2.conj().T
+
+                w1 = d1 @ v1.conj.T() @ u[0]
+                w2 = d2 @ v2.conj.T() @ u[1]
+
+                V1 = np.kron(np.eye(2), v1)
+                V2 = np.kron(np.eye(2), v2)
+                W1 = np.kron(np.eye(2), w1)
+                W2 = np.kron(np.eye(2), w2)
+
+                # I made guesses as to what these are
+                rz_angle1 = np.log(d1[-1][-1] * 2 / -1j)
+                rz_angle2 = np.log(d2[-1][-1] * 2 / -1j)
+                ry_angle = np.arccos(cs[-1][-1] * 2)
+
+                instructions += [
+                    Instruction(CompositeOperator.Unitary(V1, method="shannon"), target=target[:-1]),
+                    Instruction(CompositeOperator.MCRz(len(target), rz_angle1), target=target),
+                    Instruction(CompositeOperator.Unitary(W1, method="shannon"), target=target[:-1]),
+                    Instruction(CompositeOperator.MCRy(len(target), ry_angle), target=target),
+                    Instruction(CompositeOperator.Unitary(V2, method="shannon"), target=target[:-1]),
+                    Instruction(CompositeOperator.MCRz(len(target), rz_angle2), target=target),
+                    Instruction(CompositeOperator.Unitary(W2, method="shannon"), target=target[:-1])
+                ]
+
+        elif self._method == "default":
+            instructions.append(Instruction(Gate.Unitary(self._matrix), target=target))
+
+        return instructions
+
+    @staticmethod
+    @circuit.subroutine(register=True)
+    def unitaryop(targets: QubitSet, matrix: np.ndarray, display_name: str = "U", method: str = "default"):
+        """Registers this function into the circuit class.
+
+        Args:
+            targets (QubitSet): Target qubits.
+            matrix (numpy.ndarray): Unitary matrix which defines the gate. Matrix should be
+                compatible with the supplied targets, with `2 ** len(targets) == matrix.shape[0]`.
+            display_name (str): Name to be used for an instance of this unitary gate
+                for circuit diagrams. Defaults to `U`.
+
+        Returns:
+            Instruction: Unitary instruction.
+
+        Raises:
+            ValueError: If `matrix` is not a two-dimensional square matrix,
+                or has a dimension length that is not compatible with the `targets`,
+                or is not unitary,
+
+        Examples:
+            >>> circ = Circuit().unitaryop(matrix=np.array([[0, 1],[1, 0]]), targets=[0])
+        """
+        if 2 ** len(targets) != matrix.shape[0]:
+            raise ValueError("Dimensions of the supplied unitary are incompatible with the targets")
+
+        return Instruction(CompositeOperator.Unitary(matrix, display_name, method), target=targets)
+
+
+CompositeOperator.register_composite_operator(Unitary)
